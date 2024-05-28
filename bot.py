@@ -13,9 +13,8 @@ from parser import parse_product_info
 
 # Bot token can be obtained via https://t.me/BotFather
 TOKEN = getenv("TELEGRAM_TOKEN")
-# TOKEN = "6036100416:AAHRn2OFsI9WbOvI-w3NYQZhkSluAN6zyDo"
 
-# All handlers should be attached to the Router (or Dispatcher)
+# All handlers should be attached to the Dispatcher
 dp = Dispatcher()
 
 
@@ -24,32 +23,50 @@ async def command_start_handler(message: Message) -> None:
     """
     This handler receives messages with `/start` command
     """
-    # Most event objects have aliases for API methods that can be called in events' context
-    # For example if you want to answer to incoming message you can use `message.answer(...)` alias
-    # and the target chat will be passed to :ref:`aiogram.methods.send_message.SendMessage`
-    # method automatically or call API method directly via
-    # Bot instance: `bot.send_message(chat_id=message.chat.id, ...)`
-    await message.answer(f"Hello, {html.bold(message.from_user.full_name)}!")
+    await message.answer(
+        f"Привет, {html.bold(message.from_user.full_name)}! Введите название продукта для поиска."
+    )
 
 
 @dp.message()
 async def handle_message(message: Message):
-    search_query = message.text
+    search_query = message.text.strip()
     await message.reply(f"Ищу артикул: {search_query}...")
-    result_message = parse_product_info(search_query)
-    if not result_message:
-        await message.answer("Неверный артикул")
-    print(result_message["stock_warehouse"])
-    reply_message = (
-        f"Артикул: {search_query} \n"
-        f"{result_message["title"]}\n \n"
-        f"Бренд: {result_message["brand"]} \n"
-        f"{result_message["price"]} \n"
-        f'На складе: {result_message["stock_warehouse"]} \n'
-        f'В шоу-руме: {result_message["showroom_stock"]} \n'
-        f'На удаленном: {result_message["remote_warehouse"]} \n'
-    )
-    await message.answer(reply_message)
+
+    try:
+        result_data = parse_product_info(search_query)
+        if not result_data:
+            await message.answer("Товар не найден.")
+            return
+
+        required_keys = [
+            "title",
+            "brand",
+            "price",
+            "stock_warehouse",
+            "showroom_stock",
+            "remote_warehouse",
+            "url",
+        ]
+        if not all(key in result_data for key in required_keys):
+            await message.answer("Не удалось получить полную информацию о товаре.")
+            return
+
+        reply_message = (
+            f"{result_data['title']}\n \n"
+            f"Бренд: {result_data['brand']}\n"
+            f"Цена: {result_data['price']}\n"
+            f"На складе: {result_data['stock_warehouse']}\n"
+            f"В шоу-руме: {result_data['showroom_stock']}\n"
+            f"На удаленном складе: {result_data['remote_warehouse']}\n"
+            f"Ссылка: {result_data['url']}"
+        )
+        await message.answer(reply_message)
+    except Exception as e:
+        logging.error(f"Error while parsing product info: {e}")
+        await message.answer(
+            "Произошла ошибка при обработке запроса. Попробуйте позже."
+        )
 
 
 async def main() -> None:

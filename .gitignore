@@ -1,0 +1,5 @@
+venv
+.env
+bot_t.py
+parser_t.py
+test_parser.py
